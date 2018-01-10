@@ -79,19 +79,19 @@
 
 
 
-<meta name="description" content="1 写在前面话说 6.0 出来已经挺久了，对于权限适配我们也有很多轮子可用。关于如何适配 6.0 权限，网上资料很多也很完善，故并不会展开探讨。 不用第三方框架的话，我们会和这些 api 打交道：  Context.checkSelfPermission(String permission) Activity.requestPermissions(String[] permissions, int">
+<meta name="description" content="1 写在前面话说 6.0 出来已经挺久了，对于权限适配我们也有很多轮子可用。关于如何适配 6.0 权限，网上资料很多也很完善，故并不会展开探讨。 不用第三方框架的话，我们会和这些 api 打交道 (方法太长省略参数)：  Context.checkSelfPermission() Activity.requestPermissions() Activity.onRequestPermissions">
 <meta property="og:type" content="article">
 <meta property="og:title" content="从源码看6.0权限 —— 跟踪 Activity.requestPermissions()">
 <meta property="og:url" content="http://yoursite.com/2017/12/25/runtime-permission-analyzation/index.html">
 <meta property="og:site_name" content="bug 鸣泣之时">
-<meta property="og:description" content="1 写在前面话说 6.0 出来已经挺久了，对于权限适配我们也有很多轮子可用。关于如何适配 6.0 权限，网上资料很多也很完善，故并不会展开探讨。 不用第三方框架的话，我们会和这些 api 打交道：  Context.checkSelfPermission(String permission) Activity.requestPermissions(String[] permissions, int">
+<meta property="og:description" content="1 写在前面话说 6.0 出来已经挺久了，对于权限适配我们也有很多轮子可用。关于如何适配 6.0 权限，网上资料很多也很完善，故并不会展开探讨。 不用第三方框架的话，我们会和这些 api 打交道 (方法太长省略参数)：  Context.checkSelfPermission() Activity.requestPermissions() Activity.onRequestPermissions">
 <meta property="og:locale" content="zh-Hans">
 <meta property="og:image" content="http://yoursite.com/2017/12/25/runtime-permission-analyzation/permission_dialog.png">
 <meta property="og:image" content="http://yoursite.com/2017/12/25/runtime-permission-analyzation/permission_PMS.png">
-<meta property="og:updated_time" content="2018-01-10T16:17:50.000Z">
+<meta property="og:updated_time" content="2018-01-10T16:38:41.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="从源码看6.0权限 —— 跟踪 Activity.requestPermissions()">
-<meta name="twitter:description" content="1 写在前面话说 6.0 出来已经挺久了，对于权限适配我们也有很多轮子可用。关于如何适配 6.0 权限，网上资料很多也很完善，故并不会展开探讨。 不用第三方框架的话，我们会和这些 api 打交道：  Context.checkSelfPermission(String permission) Activity.requestPermissions(String[] permissions, int">
+<meta name="twitter:description" content="1 写在前面话说 6.0 出来已经挺久了，对于权限适配我们也有很多轮子可用。关于如何适配 6.0 权限，网上资料很多也很完善，故并不会展开探讨。 不用第三方框架的话，我们会和这些 api 打交道 (方法太长省略参数)：  Context.checkSelfPermission() Activity.requestPermissions() Activity.onRequestPermissions">
 <meta name="twitter:image" content="http://yoursite.com/2017/12/25/runtime-permission-analyzation/permission_dialog.png">
 
 
@@ -338,12 +338,12 @@
 
       
         <h1 id="1-写在前面"><a href="#1-写在前面" class="headerlink" title="1 写在前面"></a>1 写在前面</h1><p>话说 6.0 出来已经挺久了，对于权限适配我们也有很多轮子可用。关于如何适配 6.0 权限，网上资料很多也很完善，故并不会展开探讨。</p>
-<p>不用第三方框架的话，我们会和这些 api 打交道：</p>
+<p>不用第三方框架的话，我们会和这些 api 打交道 (方法太长省略参数)：</p>
 <ul>
-<li><code>Context.checkSelfPermission(String permission)</code></li>
-<li><code>Activity.requestPermissions(String[] permissions, int requestCode)</code></li>
-<li><code>Activity.onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults)</code></li>
-<li><code>Activity.shouldShowRequestPermissionRationale(String permission)</code></li>
+<li><code>Context.checkSelfPermission()</code></li>
+<li><code>Activity.requestPermissions()</code></li>
+<li><code>Activity.onRequestPermissionsResult()</code></li>
+<li><code>Activity.shouldShowRequestPermissionRationale()</code></li>
 </ul>
 <p>显然全部分析篇幅过长，根据二八法则，我们只分析主线而忽略掉庞杂的枝干。</p>
 <p>本文假设你对 6.0 权限比较熟悉，试图与大家分享从 <code>requestPermissions</code> 到 <code>onRequestPermissionsResult</code> 的背后，究竟经历了什么。</p>
