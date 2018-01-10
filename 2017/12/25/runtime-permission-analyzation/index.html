@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.3" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.3">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.3">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.3">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.3" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Hexo, NexT" />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="1 写在前面话说 6.0 出来已经挺久了，对于权限适配我们也有很多轮子可用。关于如何适配 6.0 权限，网上资料很多也很完善，故并不会展开探讨。 不用第三方框架的话，我们会和这些 api 打交道：  Context.checkSelfPermission(String permission) Activity.requestPermissions(String[] permissions, int">
+<meta property="og:type" content="article">
+<meta property="og:title" content="从源码看6.0权限 —— 跟踪 Activity.requestPermissions()">
+<meta property="og:url" content="http://yoursite.com/2017/12/25/runtime-permission-analyzation/index.html">
+<meta property="og:site_name" content="bug 鸣泣之时">
+<meta property="og:description" content="1 写在前面话说 6.0 出来已经挺久了，对于权限适配我们也有很多轮子可用。关于如何适配 6.0 权限，网上资料很多也很完善，故并不会展开探讨。 不用第三方框架的话，我们会和这些 api 打交道：  Context.checkSelfPermission(String permission) Activity.requestPermissions(String[] permissions, int">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="http://yoursite.com/2017/12/25/runtime-permission-analyzation/permission_dialog.png">
+<meta property="og:image" content="http://yoursite.com/2017/12/25/runtime-permission-analyzation/permission_PMS.png">
+<meta property="og:updated_time" content="2018-01-10T16:17:50.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="从源码看6.0权限 —— 跟踪 Activity.requestPermissions()">
+<meta name="twitter:description" content="1 写在前面话说 6.0 出来已经挺久了，对于权限适配我们也有很多轮子可用。关于如何适配 6.0 权限，网上资料很多也很完善，故并不会展开探讨。 不用第三方框架的话，我们会和这些 api 打交道：  Context.checkSelfPermission(String permission) Activity.requestPermissions(String[] permissions, int">
+<meta name="twitter:image" content="http://yoursite.com/2017/12/25/runtime-permission-analyzation/permission_dialog.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.3',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2017/12/25/runtime-permission-analyzation/"/>
+
+
+
+
+
+  <title>从源码看6.0权限 —— 跟踪 Activity.requestPermissions() | bug 鸣泣之时</title>
+  
+
+
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?68ca883dfc7a7d122c07554d1046d7b1";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">bug 鸣泣之时</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <h1 class="site-subtitle" itemprop="description"></h1>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2017/12/25/runtime-permission-analyzation/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="fashare2015">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="bug 鸣泣之时">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h2 class="post-title" itemprop="name headline">从源码看6.0权限 —— 跟踪 Activity.requestPermissions()</h2>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2017-12-25T20:11:15+08:00">
+                2017-12-25
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/12/25/runtime-permission-analyzation/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count gitment-comments-count" data-xid="/2017/12/25/runtime-permission-analyzation/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+            <span class="post-meta-divider">|</span>
+            <span class="page-pv"><i class="fa fa-file-o"></i>
+            <span class="busuanzi-value" id="busuanzi_value_page_pv" ></span>
+            </span>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h1 id="1-写在前面"><a href="#1-写在前面" class="headerlink" title="1 写在前面"></a>1 写在前面</h1><p>话说 6.0 出来已经挺久了，对于权限适配我们也有很多轮子可用。关于如何适配 6.0 权限，网上资料很多也很完善，故并不会展开探讨。</p>
+<p>不用第三方框架的话，我们会和这些 api 打交道：</p>
+<ul>
+<li><code>Context.checkSelfPermission(String permission)</code></li>
+<li><code>Activity.requestPermissions(String[] permissions, int requestCode)</code></li>
+<li><code>Activity.onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults)</code></li>
+<li><code>Activity.shouldShowRequestPermissionRationale(String permission)</code></li>
+</ul>
+<p>显然全部分析篇幅过长，根据二八法则，我们只分析主线而忽略掉庞杂的枝干。</p>
+<p>本文假设你对 6.0 权限比较熟悉，试图与大家分享从 <code>requestPermissions</code> 到 <code>onRequestPermissionsResult</code> 的背后，究竟经历了什么。</p>
+<h1 id="2-场景跟踪"><a href="#2-场景跟踪" class="headerlink" title="2 场景跟踪"></a>2 场景跟踪</h1><p>以下是 RxPermissions Demo 中，对相机权限的询问。</p>
+<p><img src="/2017/12/25/runtime-permission-analyzation/permission_dialog.png" alt="permission_dialog"></p>
+<h2 id="2-1-唤起对话框"><a href="#2-1-唤起对话框" class="headerlink" title="2.1 唤起对话框"></a>2.1 唤起对话框</h2><p>我们看到 <code>requestPermissions</code> 触发了一个对话框。然而实际上，它是一个透明的 <code>Activity</code>，而且居然沿用了 <code>startActivityForResult</code> 的逻辑，怪不得也有个 <code>requestCode</code>。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Activity</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">final</span> <span class="keyword">void</span> <span class="title">requestPermissions</span><span class="params">(@NonNull String[] permissions, <span class="keyword">int</span> requestCode)</span> </span>&#123;</span><br><span class="line">    ...</span><br><span class="line">    Intent intent = getPackageManager().buildRequestPermissionsIntent(permissions);</span><br><span class="line">    startActivityForResult(REQUEST_PERMISSIONS_WHO_PREFIX, intent, requestCode, <span class="keyword">null</span>);</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们从 <code>buildRequestPermissionsIntent</code> 往里跟，根据隐式 <code>Intent</code> 很快能找到对应的 <code>Activity</code> —— <code>GrantPermissionsActivity</code>。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// PackageManager</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> String ACTION_REQUEST_PERMISSIONS =</span><br><span class="line">            <span class="string">"android.content.pm.action.REQUEST_PERMISSIONS"</span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> Intent <span class="title">buildRequestPermissionsIntent</span><span class="params">(@NonNull String[] permissions)</span> </span>&#123;</span><br><span class="line">    ...</span><br><span class="line">    Intent intent = <span class="keyword">new</span> Intent(ACTION_REQUEST_PERMISSIONS);</span><br><span class="line">    intent.putExtra(EXTRA_REQUEST_PERMISSIONS_NAMES, permissions);</span><br><span class="line">    intent.setPackage(getPermissionControllerPackageName());</span><br><span class="line">    <span class="keyword">return</span> intent;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="2-2-点击事件"><a href="#2-2-点击事件" class="headerlink" title="2.2 点击事件"></a>2.2 点击事件</h2><p>找到 <code>Activity</code> 再进一步去找弹框和点击事件。首先看 <code>onCreate()</code>:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// GrantPermissionsActivity</span></span><br><span class="line"><span class="keyword">private</span> GrantPermissionsViewHandler mViewHandler;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onCreate</span><span class="params">(Bundle icicle)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">super</span>.onCreate(icicle);</span><br><span class="line">    setFinishOnTouchOutside(<span class="keyword">false</span>);</span><br><span class="line"></span><br><span class="line">    setTitle(R.string.permission_request_title);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (DeviceUtils.isTelevision(<span class="keyword">this</span>)) &#123; <span class="comment">// TV</span></span><br><span class="line">        mViewHandler = <span class="keyword">new</span> com.android.packageinstaller.permission.ui.television</span><br><span class="line">                .GrantPermissionsViewHandlerImpl(<span class="keyword">this</span>)</span><br><span class="line">                .setResultListener(<span class="keyword">this</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (DeviceUtils.isWear(<span class="keyword">this</span>)) &#123; <span class="comment">// 手环</span></span><br><span class="line">        mViewHandler = <span class="keyword">new</span> GrantPermissionsWatchViewHandler(<span class="keyword">this</span>)</span><br><span class="line">                .setResultListener(<span class="keyword">this</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;	<span class="comment">// 手持设备(手机)</span></span><br><span class="line">        mViewHandler = <span class="keyword">new</span> com.android.packageinstaller.permission.ui.handheld</span><br><span class="line">                .GrantPermissionsViewHandlerImpl(<span class="keyword">this</span>)</span><br><span class="line">                .setResultListener(<span class="keyword">this</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    ...</span><br><span class="line">    </span><br><span class="line">    setContentView(mViewHandler.createView());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>一看，原来权限还支持手环和TV，只看我们关心的 <code>handheld</code> 。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// handheld.GrantPermissionsViewHandlerImpl</span></span><br><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onClick</span><span class="params">(View view)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">switch</span> (view.getId()) &#123;</span><br><span class="line">        <span class="keyword">case</span> R.id.permission_allow_button:</span><br><span class="line">            <span class="keyword">if</span> (mResultListener != <span class="keyword">null</span>) &#123;</span><br><span class="line">                view.clearAccessibilityFocus();</span><br><span class="line">                mResultListener.onPermissionGrantResult(mGroupName, <span class="keyword">true</span>, <span class="keyword">false</span>);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> R.id.permission_deny_button:</span><br><span class="line">            mAllowButton.setEnabled(<span class="keyword">true</span>);</span><br><span class="line">            <span class="keyword">if</span> (mResultListener != <span class="keyword">null</span>) &#123;</span><br><span class="line">                view.clearAccessibilityFocus();</span><br><span class="line">                mResultListener.onPermissionGrantResult(mGroupName, <span class="keyword">false</span>,</span><br><span class="line">                        mDoNotAskCheckbox.isChecked());</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> R.id.do_not_ask_checkbox:</span><br><span class="line">            mAllowButton.setEnabled(!mDoNotAskCheckbox.isChecked());</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>到这里，UI部分已经对应上了。有<code>不再询问</code>的选项框以及<code>允许</code>和<code>拒绝</code>两个按钮。只是点击的逻辑实现在外边。</p>
+<h2 id="2-3-回调onAcrivityResult"><a href="#2-3-回调onAcrivityResult" class="headerlink" title="2.3 回调onAcrivityResult()"></a>2.3 回调onAcrivityResult()</h2><p>我们又回到了 <code>GrantPermissionsActivity</code>，它实现了UI的回调，然后通过 <code>setResult()</code>，把授权结果返回给我们的app页面。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// GrantPermissionsActivity implements GrantPermissionsViewHandler.ResultListener</span></span><br><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onPermissionGrantResult</span><span class="params">(String name, <span class="keyword">boolean</span> granted, <span class="keyword">boolean</span> doNotAskAgain)</span> </span>&#123;</span><br><span class="line">    GroupState groupState = mRequestGrantPermissionGroups.get(name);</span><br><span class="line">    <span class="keyword">if</span> (groupState.mGroup != <span class="keyword">null</span>) &#123;</span><br><span class="line">        <span class="keyword">if</span> (granted) &#123;</span><br><span class="line">            groupState.mGroup.grantRuntimePermissions(doNotAskAgain);</span><br><span class="line">            groupState.mState = GroupState.STATE_ALLOWED;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            groupState.mGroup.revokeRuntimePermissions(doNotAskAgain);</span><br><span class="line">            groupState.mState = GroupState.STATE_DENIED;</span><br><span class="line">        &#125;</span><br><span class="line">        updateGrantResults(groupState.mGroup);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (!showNextPermissionGroupGrantRequest()) &#123;</span><br><span class="line">        setResultAndFinish();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">setResultAndFinish</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    setResultIfNeeded(RESULT_OK);</span><br><span class="line">    finish();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">setResultIfNeeded</span><span class="params">(<span class="keyword">int</span> resultCode)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (!mResultSet) &#123;</span><br><span class="line">        mResultSet = <span class="keyword">true</span>;</span><br><span class="line">        logRequestedPermissionGroups();</span><br><span class="line">        Intent result = <span class="keyword">new</span> Intent(PackageManager.ACTION_REQUEST_PERMISSIONS);</span><br><span class="line">        result.putExtra(PackageManager.EXTRA_REQUEST_PERMISSIONS_NAMES, mRequestedPermissions);</span><br><span class="line">        result.putExtra(PackageManager.EXTRA_REQUEST_PERMISSIONS_RESULTS, mGrantResults);</span><br><span class="line">        setResult(resultCode, result);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="2-4-回调onRequestPermissionsResult"><a href="#2-4-回调onRequestPermissionsResult" class="headerlink" title="2.4 回调onRequestPermissionsResult()"></a>2.4 回调onRequestPermissionsResult()</h2><p>回到 <code>Activity</code>，我们发现在 <code>dispatchActivityResult</code> 的同时，穿插了权限的分发。然后，很自然的就走到了我们的目的地。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Activity</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">dispatchActivityResult</span><span class="params">(String who, <span class="keyword">int</span> requestCode,</span></span></span><br><span class="line"><span class="function"><span class="params">    <span class="keyword">int</span> resultCode, Intent data)</span> </span>&#123;</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">if</span> (who == <span class="keyword">null</span>) &#123;</span><br><span class="line">        onActivityResult(requestCode, resultCode, data);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (who.startsWith(REQUEST_PERMISSIONS_WHO_PREFIX)) &#123;</span><br><span class="line">        who = who.substring(REQUEST_PERMISSIONS_WHO_PREFIX.length());</span><br><span class="line">        <span class="keyword">if</span> (TextUtils.isEmpty(who)) &#123;</span><br><span class="line">            dispatchRequestPermissionsResult(requestCode, data);</span><br><span class="line">        &#125; <span class="keyword">else</span> ...    </span><br><span class="line">    &#125; <span class="keyword">else</span> ...</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">dispatchRequestPermissionsResult</span><span class="params">(<span class="keyword">int</span> requestCode, Intent data)</span> </span>&#123;</span><br><span class="line">    mHasCurrentPermissionsRequest = <span class="keyword">false</span>;</span><br><span class="line">    <span class="comment">// If the package installer crashed we may have not data - best effort.</span></span><br><span class="line">    String[] permissions = (data != <span class="keyword">null</span>) ? data.getStringArrayExtra(</span><br><span class="line">            PackageManager.EXTRA_REQUEST_PERMISSIONS_NAMES) : <span class="keyword">new</span> String[<span class="number">0</span>];</span><br><span class="line">    <span class="keyword">final</span> <span class="keyword">int</span>[] grantResults = (data != <span class="keyword">null</span>) ? data.getIntArrayExtra(</span><br><span class="line">            PackageManager.EXTRA_REQUEST_PERMISSIONS_RESULTS) : <span class="keyword">new</span> <span class="keyword">int</span>[<span class="number">0</span>];</span><br><span class="line">    onRequestPermissionsResult(requestCode, permissions, grantResults);	<span class="comment">// 终点在此</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="2-5-权限的允许-拒绝"><a href="#2-5-权限的允许-拒绝" class="headerlink" title="2.5 权限的允许/拒绝"></a>2.5 权限的允许/拒绝</h2><p>前面的逻辑基本上是UI层的，大题算是走通了。而细心的你可能发现 2.3 中遗漏了<code>权限的允许/拒绝</code>未讲。这部分涉及 <code>Binder</code> 和 <code>aidl</code> 调用，不了解的童鞋可以先去补一下。</p>
+<p>以权限允许为例，粗略的过一下调用栈：</p>
+<ul>
+<li>GrantPermissionsActivity.onPermissionGrantResult()</li>
+<li>AppPermissionGroup.grantRuntimePermissions()</li>
+<li>PackageManager.grantRuntimePermission()</li>
+<li>IPackageManager.grantRuntimePermission()</li>
+<li>PackageManagerService.grantRuntimePermission()</li>
+</ul>
+<p>最后调用到的是系统层的 PMS，大致上是根据<code>应用包名</code>和<code>权限名</code>更改 <code>sb.PermissionsState</code> 里的权限列表，最后异步保存进文件里。<br>PS: 这里的 <code>sb</code> 是 <code>SettingBase</code>，实例是 <code>PackageSetting</code>。顾名思义，它保存着应用(package)级别的设置。</p>
+<p>结合代码和断点风味更佳：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// PackageManagerService</span></span><br><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">grantRuntimePermission</span><span class="params">(String packageName, String name, <span class="keyword">final</span> <span class="keyword">int</span> userId)</span> </span>&#123;</span><br><span class="line">    ...</span><br><span class="line"></span><br><span class="line">    <span class="keyword">final</span> <span class="keyword">int</span> uid;</span><br><span class="line">    <span class="keyword">final</span> SettingBase sb;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">synchronized</span> (mPackages) &#123;</span><br><span class="line">        <span class="keyword">final</span> PackageParser.Package pkg = mPackages.get(packageName);</span><br><span class="line">        <span class="keyword">final</span> BasePermission bp = mSettings.mPermissions.get(name);</span><br><span class="line">        ...</span><br><span class="line"></span><br><span class="line">        uid = UserHandle.getUid(userId, pkg.applicationInfo.uid);</span><br><span class="line">        sb = (SettingBase) pkg.mExtras;</span><br><span class="line">        <span class="keyword">final</span> PermissionsState permissionsState = sb.getPermissionsState();</span><br><span class="line"></span><br><span class="line">        ...</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 授予权限，即更改 sb.PermissionsState 里的权限列表状态</span></span><br><span class="line">        <span class="keyword">final</span> <span class="keyword">int</span> result = permissionsState.grantRuntimePermission(bp, userId);</span><br><span class="line">        <span class="keyword">switch</span> (result) &#123;</span><br><span class="line">            <span class="keyword">case</span> PermissionsState.PERMISSION_OPERATION_FAILURE: &#123;</span><br><span class="line">                <span class="keyword">return</span>;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">case</span> PermissionsState.PERMISSION_OPERATION_SUCCESS_GIDS_CHANGED: &#123;</span><br><span class="line">                ...</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 提供一个回调 PackageManager.OnPermissionsChangedListener, 然而它对应用层是hide的</span></span><br><span class="line">        mOnPermissionChangeListeners.onPermissionsChanged(uid);</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 保存权限的更改，写入文件里</span></span><br><span class="line">        mSettings.writeRuntimePermissionsForUserLPr(userId, <span class="keyword">false</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (READ_EXTERNAL_STORAGE.equals(name)</span><br><span class="line">            || WRITE_EXTERNAL_STORAGE.equals(name)) &#123;</span><br><span class="line">        ...</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><img src="/2017/12/25/runtime-permission-analyzation/permission_PMS.png" alt="permission_PMS"></p>
+<h1 id="3-总结"><a href="#3-总结" class="headerlink" title="3 总结"></a>3 总结</h1><p>6.0 权限的主线大概过了一遍，如有纰漏请留言指正，欢迎留言探讨。</p>
+<blockquote>
+<p>另，看源码时切勿陷入一些琐碎的细节，比如最后的写入文件，大体上就一个 <code>FileOutputStream</code>，有兴趣可以看看。</p>
+<p>吾生也有涯，而知也无涯，以有涯随无涯，殆已~</p>
+</blockquote>
+<h1 id="4-感谢"><a href="#4-感谢" class="headerlink" title="4 感谢"></a>4 感谢</h1><p><a href="http://gityuan.com/2016/08/13/android-os-env/" target="_blank" rel="noopener">Android源码环境搭建 - Gityuan</a></p>
+<p><a href="http://weishu.me/2016/05/30/how-to-debug-android-framework/" target="_blank" rel="noopener">如何调试Android Framework - Weishu</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/12/25/优秀的程序员是不看源码的/" rel="next" title="优秀的程序员是不看源码的">
+                <i class="fa fa-chevron-left"></i> 优秀的程序员是不看源码的
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+        
+  <div class="bdsharebuttonbox">
+    <a href="#" class="bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+    <a href="#" class="bds_douban" data-cmd="douban" title="分享到豆瓣网"></a>
+    <a href="#" class="bds_sqq" data-cmd="sqq" title="分享到QQ好友"></a>
+    <a href="#" class="bds_qzone" data-cmd="qzone" title="分享到QQ空间"></a>
+    <a href="#" class="bds_weixin" data-cmd="weixin" title="分享到微信"></a>
+    <a href="#" class="bds_tieba" data-cmd="tieba" title="分享到百度贴吧"></a>
+    <a href="#" class="bds_twi" data-cmd="twi" title="分享到Twitter"></a>
+    <a href="#" class="bds_fbook" data-cmd="fbook" title="分享到Facebook"></a>
+    <a href="#" class="bds_more" data-cmd="more"></a>
+    <a class="bds_count" data-cmd="count"></a>
+  </div>
+  <script>
+    window._bd_share_config = {
+      "common": {
+        "bdText": "",
+        "bdMini": "2",
+        "bdMiniList": false,
+        "bdPic": ""
+      },
+      "share": {
+        "bdSize": "16",
+        "bdStyle": "0"
+      },
+      "image": {
+        "viewList": ["tsina", "douban", "sqq", "qzone", "weixin", "twi", "fbook"],
+        "viewText": "分享到：",
+        "viewSize": "16"
+      }
+    }
+  </script>
+
+<script>
+  with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='/static/api/js/share.js?cdnversion='+~(-new Date()/36e5)];
+</script>
+
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+      
+        <div id="gitment-container"></div>
+      
+    </div>
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">fashare2015</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">2</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+
+          </nav>
+
+          
+
+          <div class="links-of-author motion-element">
+            
+              
+                <span class="links-of-author-item">
+                  <a href="https://github.com/fashare2015" target="_blank" title="GitHub">
+                    
+                      <i class="fa fa-fw fa-globe"></i>GitHub</a>
+                </span>
+              
+                <span class="links-of-author-item">
+                  <a href="https://juejin.im/user/57bd25f4a34131005b211b84" target="_blank" title="掘金">
+                    
+                      <i class="fa fa-fw fa-globe"></i>掘金</a>
+                </span>
+              
+                <span class="links-of-author-item">
+                  <a href="153614131@qq.com" target="_blank" title="153614131@qq.com">
+                    
+                      <i class="fa fa-fw fa-globe"></i>153614131@qq.com</a>
+                </span>
+              
+            
+          </div>
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-写在前面"><span class="nav-number">1.</span> <span class="nav-text">1 写在前面</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-场景跟踪"><span class="nav-number">2.</span> <span class="nav-text">2 场景跟踪</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-唤起对话框"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 唤起对话框</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-点击事件"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 点击事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-回调onAcrivityResult"><span class="nav-number">2.3.</span> <span class="nav-text">2.3 回调onAcrivityResult()</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-4-回调onRequestPermissionsResult"><span class="nav-number">2.4.</span> <span class="nav-text">2.4 回调onRequestPermissionsResult()</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-5-权限的允许-拒绝"><span class="nav-number">2.5.</span> <span class="nav-text">2.5 权限的允许/拒绝</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-总结"><span class="nav-number">3.</span> <span class="nav-text">3 总结</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-感谢"><span class="nav-number">4.</span> <span class="nav-text">4 感谢</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2018</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">fashare2015</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.3</div>
+
+
+
+
+        
+<div class="busuanzi-count">
+  <script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+  
+    <span class="site-uv">
+      <i class="fa fa-user"></i>
+      <span class="busuanzi-value" id="busuanzi_value_site_uv"></span>
+      
+    </span>
+  
+
+  
+    <span class="site-pv">
+      <i class="fa fa-eye"></i>
+      <span class="busuanzi-value" id="busuanzi_value_site_pv"></span>
+      
+    </span>
+  
+</div>
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.3"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.3"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.3"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.3"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.3"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+<!-- LOCAL: You can save these files to your site and update links -->
+    
+        
+        <link rel="stylesheet" href="https://aimingoo.github.io/gitmint/style/default.css">
+        <script src="https://aimingoo.github.io/gitmint/dist/gitmint.browser.js"></script>
+    
+<!-- END LOCAL -->
+
+    
+
+    
+      <script type="text/javascript">
+      function renderGitment(){
+        var gitment = new Gitmint({
+            id: window.location.pathname, 
+            owner: 'fashare2015',
+            repo: 'fashare2015.github.io',
+            
+            lang: "" || navigator.language || navigator.systemLanguage || navigator.userLanguage,
+            
+            oauth: {
+            
+            
+                client_secret: 'a8822992907319f440183eb2a2c4d34c4f6d30da',
+            
+                client_id: '603995e576c86b532919'
+            }});
+        gitment.render('gitment-container');
+      }
+
+      
+      renderGitment();
+      
+      </script>
+    
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
