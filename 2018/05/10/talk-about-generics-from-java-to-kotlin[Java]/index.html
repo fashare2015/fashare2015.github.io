@@ -86,7 +86,7 @@
 <meta property="og:site_name" content="bug 鸣泣之时">
 <meta property="og:description" content="1. 前言私以为，泛型是 Java 语法中最难理解的一个特性。其一，它的某些特性比较反直觉。其二，Java 中的泛型是阉割版的。Java 只给出了 What，想要理解 Why，还要从 JVM 的其他语言中寻找答案。 本文会就Raw类型、类型擦除、通配符、kotlin独有的特性等话题展开探讨。 2. Java 中的泛型 Java1.5 引入了泛型，同时为了兼容旧代码，保留了Raw类型。  2.1 R">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2018-05-15T18:44:35.000Z">
+<meta property="og:updated_time" content="2018-05-15T18:53:39.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="也谈泛型，从 Java 到 Kotlin「Java篇」">
 <meta name="twitter:description" content="1. 前言私以为，泛型是 Java 语法中最难理解的一个特性。其一，它的某些特性比较反直觉。其二，Java 中的泛型是阉割版的。Java 只给出了 What，想要理解 Why，还要从 JVM 的其他语言中寻找答案。 本文会就Raw类型、类型擦除、通配符、kotlin独有的特性等话题展开探讨。 2. Java 中的泛型 Java1.5 引入了泛型，同时为了兼容旧代码，保留了Raw类型。  2.1 R">
@@ -409,8 +409,8 @@
 <blockquote>
 <p>一般的，对通配符有如下限制：</p>
 <ol>
-<li>对于协变<code>? extends Object</code>，只能<code>get()</code>，即作为生产者(Producer)。</li>
-<li>对于逆变<code>? super Object</code>，只能<code>set()</code>，即作为消费者(Consumer)。</li>
+<li>对于协变<code>? extends T</code>，只能<code>get()</code>，即作为生产者(Producer)。</li>
+<li>对于逆变<code>? super T</code>，只能<code>set()</code>，即作为消费者(Consumer)。</li>
 </ol>
 <p>俗称<code>PECS</code>: <code>Producer-extends</code>，<code>Consumer-super</code>。</p>
 </blockquote>
