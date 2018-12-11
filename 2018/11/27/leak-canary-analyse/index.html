@@ -87,7 +87,7 @@
 <meta property="og:description" content="1. 前言LeakCanary 是由 Square 开发的一款内存泄露检测工具。相比与用 IDE dump memory 的繁琐，它以轻便的日志被广大开发者所喜爱。让我们看看它是如何实现的吧。  ps: Square 以著名框架 Okhttp 被广大开发者所熟知。  2. 源码分析2.1 设计架构分析一个框架，我们可以尝试先分层。好的框架层次清晰，像TCP/IP那样，一层一层的封装起来。这里，我按">
 <meta property="og:locale" content="zh-Hans">
 <meta property="og:image" content="http://yoursite.com/2018/11/27/leak-canary-analyse/leak-canary-design.png">
-<meta property="og:updated_time" content="2018-12-11T16:17:52.000Z">
+<meta property="og:updated_time" content="2018-12-11T16:25:53.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="LeakCanary 源码分析">
 <meta name="twitter:description" content="1. 前言LeakCanary 是由 Square 开发的一款内存泄露检测工具。相比与用 IDE dump memory 的繁琐，它以轻便的日志被广大开发者所喜爱。让我们看看它是如何实现的吧。  ps: Square 以著名框架 Okhttp 被广大开发者所熟知。  2. 源码分析2.1 设计架构分析一个框架，我们可以尝试先分层。好的框架层次清晰，像TCP/IP那样，一层一层的封装起来。这里，我按">
@@ -383,7 +383,7 @@
 <li>引用队列 ReferenceQueue 作为参数传入 WeakReference.</li>
 <li>WeakReference 中的 value 变得不可达，被 JVM 回收之前，WeakReference 会被加到该队列中，等待回收。</li>
 </ol>
-<p>说白了，ReferenceQueue 提供了一种通知机制，以便在 GC 发生后，我们能做一些处理。</p>
+<p>说白了，ReferenceQueue 提供了一种通知机制，以便在 GC 发生前，我们能做一些处理。</p>
 <blockquote>
 <p>详见 <a href="https://www.jianshu.com/p/f86d3a43eec5" target="_blank" rel="noopener">Reference 、ReferenceQueue 详解</a></p>
 </blockquote>
